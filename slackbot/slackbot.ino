@@ -24,6 +24,10 @@
 const char* api_fingerprint = "AB F0 5B A9 1A E0 AE 5F CE 32 2E 7C 66 67 49 EC DD 6D 6A 38";
 
 //#define SLACK_BOT_TOKEN "put-your-slack-token-here"
+//#define SLACK_CHANNEL "xxxxxx"
+//#define SLACK_USER "xxxxxxx"
+//#define SLACK_TEAM "xxxxxx"
+
 //#define WIFI_SSID       "wifi-name"
 //#define WIFI_PASSWORD   "wifi-password"
 
@@ -48,9 +52,35 @@ void sendPing()
   webSocket.sendTXT(json);
 }
 
-void processSlackMessage(char *payload) 
+void sendHello()
 {
-// [WebSocket] Message: {"type":"message","channel":"xxxxx","user":"xxxx","text":"test123","ts":"1466878878.000005","team":"xxxx"}  
+  DynamicJsonBuffer jsonBuffer;
+  JsonObject& root = jsonBuffer.createObject();
+  root["type"] = "message";
+  root["id"] = nextCmdId++;
+  root["channel"] = SLACK_CHANNEL;
+  root["text"] = "Hello world";
+  String json;
+  root.printTo(json);
+  webSocket.sendTXT(json);
+}
+
+void processSlackMessage(String receivedpayload) 
+{
+  char json[] = "{\"type\":\"message\",\"channel\":\"xxxxx\",\"user\":\"xxxx\",\"text\":\"test1211111113\",\"ts\":\"1466878878.000005\",\"team\":\"xxxx\"}";  
+  receivedpayload.toCharArray(json, 450);
+  StaticJsonBuffer<450> jsonBuffer;
+  JsonObject& root = jsonBuffer.parseObject(json);
+
+  if (!root.success()) {
+    Serial.println("root failed");
+    return;
+  }
+  if (root.containsKey("text"))
+  {
+    const char* text = root["text"];
+    Serial.printf("[Processing] text: %s\n", text);
+  }
 }
 
 /**
@@ -68,11 +98,27 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t len)
     case WStype_CONNECTED:
       Serial.printf("[WebSocket] Connected to: %s\n", payload);
       sendPing();
+      webSocket.loop();
+      sendHello();
       break;
 
     case WStype_TEXT:
       Serial.printf("[WebSocket] Message: %s\n", payload);
-      processSlackMessage((char*)payload);
+      
+      String receivedpayload;
+      for (int i = 0; i < len; i++)
+      {
+        receivedpayload += (char)payload[i];
+      }
+      if (receivedpayload.startsWith("{\"type\":\"message"))
+      {
+        if (receivedpayload.indexOf(SLACK_CHANNEL) != -1 &&
+            receivedpayload.indexOf(SLACK_USER) != -1 &&
+            receivedpayload.indexOf(SLACK_TEAM) != -1 )
+        {
+          processSlackMessage(receivedpayload);
+        }
+      }
       break;
   }
 }
