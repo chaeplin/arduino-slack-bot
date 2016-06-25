@@ -1,3 +1,4 @@
+// slackbot testing using https://github.com/urish/arduino-slack-bot
 /**
    Arduino Real-Time Slack Bot
 
@@ -6,28 +7,28 @@
    Licensed under the MIT License
 */
 
+/*
+ modified by chaeplin @ gmail.com
+ */
+
 #include <Arduino.h>
-
 #include <ESP8266WiFi.h>
-#include <ESP8266WiFiMulti.h>
+#include <WiFiClientSecure.h>
 #include <ESP8266HTTPClient.h>
-
 #include <WebSocketsClient.h>
 #include <ArduinoJson.h>
-#include <Adafruit_NeoPixel.h>
 
-#define SLACK_BOT_TOKEN "put-your-slack-token-here"
-#define WIFI_SSID       "wifi-name"
-#define WIFI_PASSWORD   "wifi-password"
+#include "/usr/local/src/ap_setting.h"
+#include "/usr/local/src/slack_setting.h"
 
-#define LEDS_PIN        D2
-#define LEDS_NUMPIXELS  24
-#define WORD_SEPERATORS "., \"'()[]<>;:-+&?!\n\t"
+const char* api_fingerprint = "AB F0 5B A9 1A E0 AE 5F CE 32 2E 7C 66 67 49 EC DD 6D 6A 38";
 
-ESP8266WiFiMulti WiFiMulti;
+//#define SLACK_BOT_TOKEN "put-your-slack-token-here"
+//#define WIFI_SSID       "wifi-name"
+//#define WIFI_PASSWORD   "wifi-password"
+
+WiFiClientSecure sslclient;
 WebSocketsClient webSocket;
-
-Adafruit_NeoPixel pixels(LEDS_NUMPIXELS, LEDS_PIN, NEO_GRB + NEO_KHZ800);
 
 long nextCmdId = 1;
 bool connected = false;
@@ -36,7 +37,8 @@ bool connected = false;
   Sends a ping message to Slack. Call this function immediately after establishing
   the WebSocket connection, and then every 5 seconds to keep the connection alive.
 */
-void sendPing() {
+void sendPing() 
+{
   DynamicJsonBuffer jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
   root["type"] = "ping";
@@ -46,106 +48,17 @@ void sendPing() {
   webSocket.sendTXT(json);
 }
 
-/**
-  Input a value 0 to 255 to get a color value.
-  The colors are a transition r - g - b - back to r.
-*/
-uint32_t wheel(byte wheelPos) {
-  wheelPos = 255 - wheelPos;
-  if (wheelPos < 85) {
-    return pixels.Color(255 - wheelPos * 3, 0, wheelPos * 3);
-  }
-  if (wheelPos < 170) {
-    wheelPos -= 85;
-    return pixels.Color(0, wheelPos * 3, 255 - wheelPos * 3);
-  }
-  wheelPos -= 170;
-  return pixels.Color(wheelPos * 3, 255 - wheelPos * 3, 0);
-}
-
-/**
-  Animate a NeoPixel ring color change.
-  Setting `zebra` to true skips every other led.
-*/
-void drawColor(uint32_t color, bool zebra) {
-  int step = zebra ? 2 : 1;
-  for (int i = 0; i < LEDS_NUMPIXELS; i += step) {
-    pixels.setPixelColor(i, color);
-    pixels.show();
-    delay(30 * step);
-  }
-}
-
-/**
-  Draws a rainbow :-)
-*/
-void drawRainbow(bool zebra) {
-  int step = zebra ? 2 : 1;
-  for (int i = 0; i < LEDS_NUMPIXELS; i += step) {
-    pixels.setPixelColor(i, wheel(i * 256 / LEDS_NUMPIXELS));
-    pixels.show();
-    delay(30 * step);
-  }
-}
-
-/**
-  Looks for color names in the incoming slack messages and
-  animates the ring accordingly. You can include several
-  colors in a single message, e.g. `red blue zebra black yellow rainbow`
-*/
-void processSlackMessage(char *payload) {
-  char *nextWord = NULL;
-  bool zebra = false;
-  for (nextWord = strtok(payload, WORD_SEPERATORS); nextWord; nextWord = strtok(NULL, WORD_SEPERATORS)) {
-    if (strcasecmp(nextWord, "zebra") == 0) {
-      zebra = true;
-    }
-    if (strcasecmp(nextWord, "red") == 0) {
-      drawColor(pixels.Color(255, 0, 0), zebra);
-    }
-    if (strcasecmp(nextWord, "green") == 0) {
-      drawColor(pixels.Color(0, 255, 0), zebra);
-    }
-    if (strcasecmp(nextWord, "blue") == 0) {
-      drawColor(pixels.Color(0, 0, 255), zebra);
-    }
-    if (strcasecmp(nextWord, "yellow") == 0) {
-      drawColor(pixels.Color(255, 160, 0), zebra);
-    }
-    if (strcasecmp(nextWord, "white") == 0) {
-      drawColor(pixels.Color(255, 255, 255), zebra);
-    }
-    if (strcasecmp(nextWord, "purple") == 0) {
-      drawColor(pixels.Color(128, 0, 128), zebra);
-    }
-    if (strcasecmp(nextWord, "pink") == 0) {
-      drawColor(pixels.Color(255, 0, 96), zebra);
-    }
-    if (strcasecmp(nextWord, "orange") == 0) {
-      drawColor(pixels.Color(255, 64, 0), zebra);
-    }
-    if (strcasecmp(nextWord, "black") == 0) {
-      drawColor(pixels.Color(0, 0, 0), zebra);
-    }
-    if (strcasecmp(nextWord, "rainbow") == 0) {
-      drawRainbow(zebra);
-    }
-    if (nextWord[0] == '#') {
-      int color = strtol(&nextWord[1], NULL, 16);
-      Serial.println("Color");
-      Serial.print(color);
-      if (color) {
-        drawColor(color, zebra);
-      }
-    }
-  }
+void processSlackMessage(char *payload) 
+{
+// [WebSocket] Message: {"type":"message","channel":"xxxxx","user":"xxxx","text":"test123","ts":"1466878878.000005","team":"xxxx"}  
 }
 
 /**
   Called on each web socket event. Handles disconnection, and also
   incoming messages from slack.
 */
-void webSocketEvent(WStype_t type, uint8_t *payload, size_t len) {
+void webSocketEvent(WStype_t type, uint8_t *payload, size_t len) 
+{
   switch (type) {
     case WStype_DISCONNECTED:
       Serial.printf("[WebSocket] Disconnected :-( \n");
@@ -170,13 +83,17 @@ void webSocketEvent(WStype_t type, uint8_t *payload, size_t len) {
   2. Conencts the WebSocket
   Returns true if the connection was established successfully.
 */
-bool connectToSlack() {
+bool connectToSlack() 
+{
   // Step 1: Find WebSocket address via RTM API (https://api.slack.com/methods/rtm.start)
   HTTPClient http;
-  http.begin("https://slack.com/api/rtm.start?token=" SLACK_BOT_TOKEN);
-  int httpCode = http.GET();
+  String uri_to_post = "/api/rtm.start?token=";
+  uri_to_post += SLACK_BOT_TOKEN;
 
-  if (httpCode != HTTP_CODE_OK) {
+  http.begin("slack.com", 443, uri_to_post, api_fingerprint);
+  int httpCode = http.GET();
+  if (httpCode != HTTP_CODE_OK) 
+  {
     Serial.printf("HTTP GET failed with code %d\n", httpCode);
     return false;
   }
@@ -196,12 +113,12 @@ bool connectToSlack() {
 
 void setup() {
   Serial.begin(115200);
-  Serial.setDebugOutput(true);
+  //Serial.setDebugOutput(true);
 
-  pixels.begin();
-
-  WiFiMulti.addAP(WIFI_SSID, WIFI_PASSWORD);
-  while (WiFiMulti.run() != WL_CONNECTED) {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  while (WiFi.status() != WL_CONNECTED) 
+  {
     delay(100);
   }
 
@@ -213,21 +130,25 @@ unsigned long lastPing = 0;
 /**
   Sends a ping every 5 seconds, and handles reconnections
 */
-void loop() {
+void loop() 
+{
   webSocket.loop();
 
   if (connected) {
     // Send ping every 5 seconds, to keep the connection alive
-    if (millis() - lastPing > 5000) {
+    if (millis() - lastPing > 5000) 
+    {
       sendPing();
       lastPing = millis();
     }
-  } else {
+  } 
+  else 
+  {
     // Try to connect / reconnect to slack
     connected = connectToSlack();
-    if (!connected) {
+    if (!connected) 
+    {
       delay(500);
     }
   }
 }
-
